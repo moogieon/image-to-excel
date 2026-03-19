@@ -1,0 +1,61 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Converter from '../../components/Converter';
+import PricingCard from '../../components/PricingCard';
+import { t } from '../../i18n/translations';
+
+const lang = 'ko';
+---
+
+<Layout title={t(lang, 'site.title')} description={t(lang, 'site.description')} lang={lang}>
+  <section class="pt-16 pb-10 px-5">
+    <div class="max-w-3xl mx-auto text-center">
+      <div class="inline-flex items-center gap-2 liquid-glass rounded-full px-4 py-1.5 text-[13px] font-medium text-text-secondary mb-6 animate-fade-in">
+        <div class="w-2 h-2 rounded-full bg-success animate-pulse-soft"></div>
+        OCR 기반 변환 엔진
+      </div>
+      <h1 class="text-[40px] md:text-[52px] font-bold tracking-tight leading-[1.08] animate-slide-up">{t(lang, 'hero.title')}</h1>
+      <p class="mt-5 text-[17px] text-text-muted max-w-lg mx-auto leading-relaxed animate-slide-up-delayed">{t(lang, 'hero.subtitle')}</p>
+    </div>
+  </section>
+
+  <section class="pb-20 px-5">
+    <div class="max-w-2xl mx-auto"><Converter lang={lang} client:load /></div>
+  </section>
+
+  <section class="py-16 px-5">
+    <div class="max-w-4xl mx-auto">
+      <div class="grid md:grid-cols-3 gap-5">
+        <div class="liquid-glass liquid-glass-hover rounded-[28px] p-6 text-center">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-[#28A06A] to-[#217346] flex items-center justify-center shadow-lg shadow-primary/15 mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <h3 class="font-semibold text-[15px] mb-1.5">표 구조 인식</h3>
+          <p class="text-[13px] text-text-muted leading-relaxed">OCR 엔진이 행, 열, 헤더를 높은 정확도로 감지</p>
+        </div>
+        <div class="liquid-glass liquid-glass-hover rounded-[28px] p-6 text-center">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/15 mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+          </div>
+          <h3 class="font-semibold text-[15px] mb-1.5">보안 처리</h3>
+          <p class="text-[13px] text-text-muted leading-relaxed">클라이언트 측 처리로 문서가 브라우저를 떠나지 않습니다</p>
+        </div>
+        <div class="liquid-glass liquid-glass-hover rounded-[28px] p-6 text-center">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/15 mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <h3 class="font-semibold text-[15px] mb-1.5">다양한 내보내기</h3>
+          <p class="text-[13px] text-text-muted leading-relaxed">엑셀, 클립보드, Google Sheets</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" class="py-16 px-5">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-[28px] font-bold text-center mb-3 tracking-tight">{t(lang, 'pricing.title')}</h2>
+      <p class="text-center text-text-muted text-[15px] mb-10">1 크레딧 = 1 페이지</p>
+      <PricingCard lang={lang} client:visible />
+    </div>
+  </section>
+</Layout>

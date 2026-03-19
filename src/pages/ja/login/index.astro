@@ -1,0 +1,15 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import AuthForm from '../../../components/AuthForm';
+import { t } from '../../../i18n/translations';
+
+const lang = 'ja';
+---
+
+<Layout title={`${t(lang, 'nav.login')} - ${t(lang, 'site.title')}`} lang={lang}>
+  <section class="flex items-center justify-center min-h-[calc(100vh-10rem)] px-4 py-12">
+    <div class="liquid-glass rounded-[32px] p-8 md:p-10 w-full max-w-[460px]">
+      <AuthForm lang={lang} mode="login" client:load />
+    </div>
+  </section>
+</Layout>
