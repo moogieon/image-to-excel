@@ -28,15 +28,12 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
     <div className="w-full max-w-[400px] mx-auto animate-scale-in">
       <div className="text-center mb-8">
         <a href={`/${lang}`} className="inline-flex items-center gap-2.5 mb-6">
-          <div className="w-10 h-10 rounded-[12px] bg-gradient-to-br from-[#28A06A] to-[#217346] flex items-center justify-center shadow-lg shadow-primary/25">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
+          <div className="w-10 h-10 rounded-[12px] overflow-hidden">
+            <img src="/images/logo-main.jpg" alt="Image2Excel" width="40" height="40" className="w-full h-full object-cover" />
           </div>
-          <span className="text-xl font-semibold tracking-tight">Image<span className="text-primary">2</span>Excel</span>
+          <span className="text-xl font-semibold tracking-tight text-text">Image<span className="text-primary-light">2</span>Excel</span>
         </a>
-        <h1 className="text-[26px] font-bold tracking-tight">
+        <h1 className="text-[26px] font-bold tracking-tight text-text">
           {isLogin ? t(lang, 'auth.login.title') : t(lang, 'auth.signup.title')}
         </h1>
         <p className="text-[15px] text-text-muted mt-2">
@@ -54,18 +51,12 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
           </svg>
           {t(lang, 'auth.google')}
         </button>
-        <button className="btn-glass w-full py-2.5 rounded-2xl text-[14px] font-medium flex items-center justify-center gap-2.5">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-          GitHub
-        </button>
       </div>
 
       <div className="flex items-center gap-3 mb-6">
-        <div className="flex-1 h-px bg-white/15" />
+        <div className="flex-1 h-px bg-black/6" />
         <span className="text-[12px] text-text-muted font-medium uppercase tracking-wider">{t(lang, 'auth.or')}</span>
-        <div className="flex-1 h-px bg-white/15" />
+        <div className="flex-1 h-px bg-black/6" />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -106,14 +97,14 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
 
         {isLogin && (
           <div className="text-right">
-            <button type="button" className="text-[13px] text-primary hover:text-primary-dark transition-colors">{t(lang, 'auth.forgot')}</button>
+            <button type="button" className="text-[13px] text-primary-light hover:text-primary transition-colors">{t(lang, 'auth.forgot')}</button>
           </div>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className={`w-full py-3 rounded-2xl font-semibold text-white text-[15px] mt-2 ${loading ? 'opacity-60 cursor-not-allowed' : 'btn-primary'}`}
+          className={`w-full py-3 rounded-2xl font-semibold text-[15px] mt-2 ${loading ? 'opacity-60 cursor-not-allowed bg-black/10 text-text-muted' : 'btn-primary'}`}
         >
           {loading ? (
             <svg className="animate-spin w-[18px] h-[18px] mx-auto" viewBox="0 0 24 24" fill="none">
@@ -126,7 +117,7 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
 
       <p className="text-center text-[14px] text-text-muted mt-6">
         {isLogin ? t(lang, 'auth.login.switch') : t(lang, 'auth.signup.switch')}{' '}
-        <button onClick={() => setMode(isLogin ? 'signup' : 'login')} className="text-primary font-medium hover:text-primary-dark transition-colors">
+        <button onClick={() => setMode(isLogin ? 'signup' : 'login')} className="text-primary-light font-medium hover:text-primary transition-colors">
           {isLogin ? t(lang, 'auth.signup.link') : t(lang, 'auth.login.link')}
         </button>
       </p>

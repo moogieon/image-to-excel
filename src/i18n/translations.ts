@@ -85,7 +85,7 @@ export const translations = {
     'nav.pricing': '요금제',
     'nav.login': '로그인',
     'hero.title': '이미지 & PDF를 엑셀로 변환',
-    'hero.subtitle': '광학 문자 인식(OCR) 기술로 스캔된 문서의 표와 텍스트를 편집 가능한 스프레드시트로 추출합니다',
+    'hero.subtitle': '스캔된 문서에서 표와 텍스트를 추출해 바로 엑셀로 변환합니다',
     'hero.cta': '무료로 시작하기',
     'upload.title': '파일 업로드',
     'upload.dragdrop': '여기에 파일을 드래그 앤 드롭하세요',
