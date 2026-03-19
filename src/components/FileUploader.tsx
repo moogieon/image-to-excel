@@ -96,9 +96,9 @@ export default function FileUploader({ lang, onFileSelect, disabled }: Props) {
         onClick={() => !disabled && inputRef.current?.click()}
         style={{ transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
         className={`
-          relative rounded-[28px] p-8 md:p-10 text-center cursor-pointer
+          relative rounded-[24px] p-8 md:p-10 text-center cursor-pointer
           ${isDragging
-            ? 'liquid-glass-green scale-[1.02]'
+            ? 'liquid-glass-accent scale-[1.02]'
             : 'liquid-glass liquid-glass-hover'
           }
           ${disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}
@@ -120,8 +120,8 @@ export default function FileUploader({ lang, onFileSelect, disabled }: Props) {
           </div>
         ) : fileName ? (
           <div className="space-y-3 animate-scale-in">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center shadow-lg">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-black/6 flex items-center justify-center">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary-light">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
@@ -130,25 +130,21 @@ export default function FileUploader({ lang, onFileSelect, disabled }: Props) {
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#28A06A] to-[#217346] flex items-center justify-center shadow-lg shadow-primary/20">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
+            <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden">
+              <img src="/images/icon-upload.jpg" alt="Upload" width="64" height="64" className="w-full h-full object-cover" />
             </div>
             <div className="space-y-1.5">
               <p className="text-[17px] font-semibold text-text tracking-tight">{t(lang, 'upload.dragdrop')}</p>
               <p className="text-[15px] text-text-muted">
                 {t(lang, 'upload.or')}{' '}
-                <span className="text-primary font-medium">{t(lang, 'upload.browse')}</span>
+                <span className="text-primary-light font-medium">{t(lang, 'upload.browse')}</span>
               </p>
             </div>
             <div className="flex flex-col items-center gap-1.5">
-              <span className="inline-flex items-center gap-1.5 text-xs text-text-muted bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20">
-                <kbd className="text-[10px] font-mono bg-white/30 px-1.5 py-0.5 rounded border border-white/20">Ctrl</kbd>
+              <span className="inline-flex items-center gap-1.5 text-xs text-text-muted bg-black/4 px-3 py-1.5 rounded-full border border-black/6">
+                <kbd className="text-[10px] font-mono bg-black/8 px-1.5 py-0.5 rounded border border-black/6">Ctrl</kbd>
                 <span>+</span>
-                <kbd className="text-[10px] font-mono bg-white/30 px-1.5 py-0.5 rounded border border-white/20">V</kbd>
+                <kbd className="text-[10px] font-mono bg-black/8 px-1.5 py-0.5 rounded border border-black/6">V</kbd>
               </span>
               <p className="text-xs text-text-muted">{t(lang, 'upload.supported')}</p>
             </div>
@@ -156,15 +152,15 @@ export default function FileUploader({ lang, onFileSelect, disabled }: Props) {
         )}
 
         {isDragging && (
-          <div className="absolute inset-0 rounded-[28px] border-2 border-dashed border-primary/50 flex items-center justify-center animate-fade-in">
-            <div className="text-primary font-semibold text-lg">Drop here</div>
+          <div className="absolute inset-0 rounded-[24px] border-2 border-dashed border-primary/50 flex items-center justify-center animate-fade-in">
+            <div className="text-primary-light font-semibold text-lg">Drop here</div>
           </div>
         )}
       </div>
 
       {error && (
         <div className="mt-3 flex items-center gap-2 text-sm text-danger animate-slide-up px-1">
-          <div className="w-5 h-5 rounded-full bg-danger/10 flex items-center justify-center shrink-0">
+          <div className="w-5 h-5 rounded-full bg-danger/15 flex items-center justify-center shrink-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
