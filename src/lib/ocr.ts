@@ -29,94 +29,57 @@ export function fileToBase64(file: File): Promise<string> {
   });
 }
 
+export interface ExtractedField {
+  key: string;
+  value: string;
+}
+
 export interface ExtractedData {
+  fields?: ExtractedField[];
   headers: string[];
   rows: string[][];
 }
 
-export async function extractWithOCR(
-  file: File,
-  apiKey: string
-): Promise<ExtractedData> {
+const API_BASE = 'http://localhost:8000';
+
+export async function extractWithOCR(file: File): Promise<ExtractedData> {
   const base64 = await fileToBase64(file);
-  const isImage = file.type.startsWith('image/');
 
-  const content: Array<Record<string, unknown>> = [];
-
-  if (isImage) {
-    content.push({
-      type: 'image_url',
-      image_url: {
-        url: `data:${file.type};base64,${base64}`,
-      },
-    });
-  } else {
-    content.push({
-      type: 'file',
-      file: {
-        filename: file.name,
-        file_data: `data:${file.type};base64,${base64}`,
-      },
-    });
-  }
-
-  content.push({
-    type: 'text',
-    text: `Extract all tabular data from this document. Return the result as a JSON object with:
-- "headers": an array of column header strings
-- "rows": an array of arrays, where each inner array contains the cell values as strings
-
-If the document contains multiple tables, merge them if they have the same structure, or use the largest table.
-If there are no clear headers, generate descriptive headers based on the content.
-Return ONLY the JSON object, no markdown or explanation.`,
-  });
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(`${API_BASE}/api/extract`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content,
-        },
-      ],
-      max_tokens: 4096,
-      temperature: 0,
+      base64,
+      mimeType: file.type,
     }),
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(
-      (err as { error?: { message?: string } })?.error?.message ||
-        `OCR API error: ${response.status}`
-    );
+    throw new Error(data.detail || `OCR error: ${response.status}`);
   }
 
-  const data = (await response.json()) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-  const text = data.choices[0]?.message?.content?.trim() ?? '';
-
-  // Parse JSON from response, handling possible markdown code blocks
-  let jsonStr = text;
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    jsonStr = codeBlockMatch[1].trim();
-  }
-
-  try {
-    const parsed = JSON.parse(jsonStr) as ExtractedData;
-    if (!parsed.headers || !parsed.rows) {
-      throw new Error('Invalid response structure');
-    }
-    return parsed;
-  } catch {
+  if (!data.headers || !data.rows) {
     throw new Error('Failed to parse OCR results. Please try again.');
   }
+
+  return data as ExtractedData;
+}
+
+export async function fetchPreprocessPreview(file: File): Promise<string> {
+  const base64 = await fileToBase64(file);
+
+  const response = await fetch(`${API_BASE}/api/preview/preprocess`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64, mimeType: file.type }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Preprocess preview failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
 }
