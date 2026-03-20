@@ -1,0 +1,48 @@
+# 유저 정보 + 현재 구독 조회
+query GetUserWithPlan($uid: String!) @auth(level: USER) {
+  users(where: { uid: { eq: $uid } }, limit: 1) {
+    id
+    uid
+    email
+    displayName
+    plan
+    userPlans_on_user(orderBy: [{ startedAt: DESC }], limit: 1) {
+      id
+      plan
+      name
+      status
+      tokensRemaining
+      tokensTotal
+      billingCycle
+      startedAt
+      expiresAt
+      canceledAt
+      cancelReason
+    }
+  }
+}
+
+# 오늘 사용량 조회
+query GetTodayUsage($uid: String!, $today: Timestamp!) @auth(level: USER) {
+  usageLogs(where: {
+    user: { uid: { eq: $uid } },
+    usedAt: { ge: $today }
+  }) {
+    pagesUsed
+    fileName
+    usedAt
+  }
+}
+
+# 사용 이력 조회
+query GetUsageHistory($uid: String!, $limit: Int) @auth(level: USER) {
+  usageLogs(
+    where: { user: { uid: { eq: $uid } } }
+    orderBy: [{ usedAt: DESC }]
+    limit: $limit
+  ) {
+    pagesUsed
+    fileName
+    usedAt
+  }
+}

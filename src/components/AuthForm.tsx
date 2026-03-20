@@ -1,10 +1,28 @@
 import { useState } from 'react';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
+import { signUpWithEmail, signInWithEmail, signInWithGoogle, resetPassword } from '../lib/auth';
+import { FirebaseError } from 'firebase/app';
 
 interface Props {
   lang: Lang;
   mode: 'login' | 'signup';
+}
+
+function getErrorMessage(lang: Lang, error: unknown): string {
+  if (!(error instanceof FirebaseError)) return t(lang, 'auth.error.unknown');
+  const map: Record<string, keyof typeof import('../i18n/translations').translations['en']> = {
+    'auth/email-already-in-use': 'auth.error.emailInUse',
+    'auth/invalid-email': 'auth.error.invalidEmail',
+    'auth/weak-password': 'auth.error.weakPassword',
+    'auth/user-not-found': 'auth.error.userNotFound',
+    'auth/wrong-password': 'auth.error.wrongPassword',
+    'auth/invalid-credential': 'auth.error.invalidCredential',
+    'auth/too-many-requests': 'auth.error.tooManyRequests',
+    'auth/popup-closed-by-user': 'auth.error.popupClosed',
+  };
+  const key = map[error.code];
+  return key ? t(lang, key) : t(lang, 'auth.error.unknown');
 }
 
 export default function AuthForm({ lang, mode: initialMode }: Props) {
@@ -14,15 +32,75 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+
+  const isLogin = mode === 'login';
+
+  const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+
+  const validatePassword = (pw: string): boolean => {
+    if (pw.length < 8) {
+      setPasswordError(t(lang, 'auth.error.weakPassword'));
+      return false;
+    }
+    if (!PASSWORD_REGEX.test(pw)) {
+      setPasswordError(t(lang, 'auth.error.passwordFormat'));
+      return false;
+    }
+    setPasswordError('');
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLogin && !validatePassword(password)) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setLoading(false);
+    setError('');
+    try {
+      if (isLogin) {
+        await signInWithEmail(email, password);
+      } else {
+        await signUpWithEmail(email, password, name);
+      }
+      window.location.href = `/${lang}`;
+    } catch (err) {
+      setError(getErrorMessage(lang, err));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const isLogin = mode === 'login';
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithGoogle();
+      window.location.href = `/${lang}`;
+    } catch (err) {
+      setError(getErrorMessage(lang, err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError(t(lang, 'auth.error.enterEmail'));
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await resetPassword(email);
+      setResetSent(true);
+    } catch (err) {
+      setError(getErrorMessage(lang, err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-[400px] mx-auto animate-scale-in">
@@ -44,8 +122,24 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-4 px-4 py-3 rounded-2xl bg-red-50/80 backdrop-blur-sm border border-red-200/50 text-red-600 text-[13px]">
+          {error}
+        </div>
+      )}
+
+      {resetSent && (
+        <div className="mb-4 px-4 py-3 rounded-2xl bg-emerald-50/80 backdrop-blur-sm border border-emerald-200/50 text-emerald-600 text-[13px]">
+          {t(lang, 'auth.resetSent')}
+        </div>
+      )}
+
       <div className="space-y-2.5 mb-6">
-        <button className="btn-glass w-full py-2.5 rounded-2xl text-[14px] font-medium flex items-center justify-center gap-2.5">
+        <button
+          onClick={handleGoogle}
+          disabled={loading}
+          className="btn-glass w-full py-2.5 rounded-2xl text-[14px] font-medium flex items-center justify-center gap-2.5 disabled:opacity-50"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -53,12 +147,6 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
           {t(lang, 'auth.google')}
-        </button>
-        <button className="btn-glass w-full py-2.5 rounded-2xl text-[14px] font-medium flex items-center justify-center gap-2.5">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-          GitHub
         </button>
       </div>
 
@@ -102,11 +190,16 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
               )}
             </button>
           </div>
+          {!isLogin && (
+            <p className={`text-[12px] mt-1.5 ml-1 ${passwordError ? 'text-red-400' : 'text-text-muted'}`}>
+              {passwordError || t(lang, 'auth.error.passwordFormat')}
+            </p>
+          )}
         </div>
 
         {isLogin && (
           <div className="text-right">
-            <button type="button" className="text-[13px] text-primary hover:text-primary-dark transition-colors">{t(lang, 'auth.forgot')}</button>
+            <button type="button" onClick={handleResetPassword} className="text-[13px] text-primary hover:text-primary-dark transition-colors">{t(lang, 'auth.forgot')}</button>
           </div>
         )}
 
@@ -126,8 +219,8 @@ export default function AuthForm({ lang, mode: initialMode }: Props) {
 
       <p className="text-center text-[14px] text-text-muted mt-6">
         {isLogin ? t(lang, 'auth.login.switch') : t(lang, 'auth.signup.switch')}{' '}
-        <button onClick={() => setMode(isLogin ? 'signup' : 'login')} className="text-primary font-medium hover:text-primary-dark transition-colors">
-          {isLogin ? t(lang, 'auth.signup.link') : t(lang, 'auth.login.link')}
+        <button onClick={() => { setMode(isLogin ? 'signup' : 'login'); setError(''); setResetSent(false); }} className="text-primary font-medium hover:text-primary-dark transition-colors">
+          {isLogin ? t(lang, 'auth.login.link') : t(lang, 'auth.signup.link')}
         </button>
       </p>
     </div>

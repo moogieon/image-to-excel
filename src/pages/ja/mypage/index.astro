@@ -1,0 +1,13 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import MyPage from '../../../components/MyPage';
+import { t } from '../../../i18n/translations';
+
+const lang = 'ja';
+---
+
+<Layout title={`${t(lang, 'auth.mypage')} - ${t(lang, 'site.title')}`} lang={lang}>
+  <section class="px-4 py-12">
+    <MyPage lang={lang} client:load />
+  </section>
+</Layout>

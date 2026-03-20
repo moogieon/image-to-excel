@@ -1,0 +1,47 @@
+# 구독 플랜 정의
+enum PlanType {
+  FREE
+  PRO
+  PAYGO
+  SUPER_ADMIN
+}
+
+# 구독 상태
+enum UserPlanStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+# 유저 테이블 (Firebase Auth uid 연동)
+type User @table {
+  uid: String! @unique
+  email: String!
+  displayName: String
+  plan: PlanType! @default(value: "FREE")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+# 구독 테이블
+type UserPlan @table {
+  user: User!
+  plan: PlanType!
+  name: String!
+  status: UserPlanStatus! @default(value: "ACTIVE")
+  tokensRemaining: Int! @default(value: 3)
+  tokensTotal: Int! @default(value: 3)
+  billingCycle: String
+  startedAt: Timestamp! @default(expr: "request.time")
+  expiresAt: Timestamp
+  canceledAt: Timestamp
+  cancelReason: String
+}
+
+# 사용 이력 테이블
+type UsageLog @table {
+  user: User!
+  pagesUsed: Int!
+  fileName: String
+  usedAt: Timestamp! @default(expr: "request.time")
+}

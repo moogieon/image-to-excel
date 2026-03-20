@@ -1,6 +1,11 @@
 import type { APIRoute } from 'astro';
+import { verifyToken, dcQuery, dcMutation, getAdminAuth } from '../../lib/admin';
+import type { GetUserWithPlanData, GetTodayUsageData, CreateUserData } from '../../lib/dataconnect-sdk';
 
 export const prerender = false;
+
+// 플랜별 일일 무료 제한
+const DAILY_FREE_LIMIT = 3;
 
 const EXTRACTION_PROMPT = `Extract all tabular data from the following OCR text. Return the result as a JSON object with:
 - "headers": an array of column header strings
@@ -112,21 +117,101 @@ async function structureWithGpt4o(ocrText: string) {
 // ─── API Route ───
 export const POST: APIRoute = async ({ request }) => {
   try {
+    // 1. 인증 검증
+    let uid: string;
+    try {
+      uid = await verifyToken(request.headers.get('Authorization'));
+    } catch {
+      return new Response(JSON.stringify({ error: 'Login required' }), { status: 401 });
+    }
+
+    // 2. 유저 + 구독 정보 조회 (없으면 자동 생성)
+    let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid });
+    let user = userData.users[0];
+
+    if (!user) {
+      // Firebase Auth에서 유저 정보 가져와서 자동 생성
+      const authUser = await getAdminAuth().getUser(uid);
+      const createResult = await dcMutation<CreateUserData>('CreateUser', {
+        uid,
+        email: authUser.email || '',
+        displayName: authUser.displayName || null,
+      });
+
+      // Free 구독 자동 생성
+      const userId = createResult.user_insert;
+      if (userId) {
+        await dcMutation('CreateFreeUserPlan', { userId });
+      }
+
+      // 다시 조회
+      userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid });
+      user = userData.users[0];
+
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'Failed to create user' }), { status: 500 });
+      }
+    }
+
+    const activePlan = user.userPlans_on_user.find(p => p.status === 'ACTIVE');
+
+    // 3. 크레딧 체크 (SUPER_ADMIN은 무제한)
+    if (user.plan === 'SUPER_ADMIN') {
+      // 무제한 — 크레딧 체크 스킵
+    } else if (user.plan === 'FREE' || !activePlan) {
+      // Free 플랜: 오늘 사용량 체크
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const usageData = await dcQuery<GetTodayUsageData>('GetTodayUsage', {
+        uid,
+        today: today.toISOString(),
+      });
+      const todayUsed = usageData.usageLogs.reduce((sum, log) => sum + log.pagesUsed, 0);
+
+      if (todayUsed >= DAILY_FREE_LIMIT) {
+        return new Response(JSON.stringify({
+          error: 'Daily free limit reached',
+          code: 'LIMIT_EXCEEDED',
+          used: todayUsed,
+          limit: DAILY_FREE_LIMIT,
+        }), { status: 429 });
+      }
+    } else {
+      // Pro/PayGo 플랜: 토큰 잔량 체크
+      if (activePlan.tokensRemaining <= 0) {
+        return new Response(JSON.stringify({
+          error: 'No tokens remaining',
+          code: 'NO_TOKENS',
+          tokensRemaining: 0,
+        }), { status: 429 });
+      }
+    }
+
+    // 4. 요청 파싱
     const body = await request.json();
-    const { base64, mimeType } = body as {
-      base64: string;
-      mimeType: string;
-    };
+    const { base64, mimeType } = body as { base64: string; mimeType: string };
 
     if (!base64 || !mimeType) {
       return new Response(JSON.stringify({ error: 'Missing file data' }), { status: 400 });
     }
 
-    // 1. Google Vision으로 텍스트 추출 (OCR)
+    // 5. OCR 처리
     const ocrText = await ocrWithVision(base64);
-
-    // 2. GPT-4o로 테이블 구조화
     const result = await structureWithGpt4o(ocrText);
+
+    // 6. 사용 기록 + 크레딧 차감
+    await dcMutation('LogUsage', {
+      userId: { id: user.id },
+      pagesUsed: 1,
+      fileName: (body as { fileName?: string }).fileName || null,
+    });
+
+    if (activePlan && user.plan !== 'FREE' && user.plan !== 'SUPER_ADMIN') {
+      await dcMutation('DeductToken', {
+        userPlanId: { id: activePlan.id },
+        remaining: activePlan.tokensRemaining - 1,
+      });
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },
