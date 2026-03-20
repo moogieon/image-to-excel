@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { languages, t, type Lang } from '../i18n/translations';
+import UserMenu from '../components/UserMenu.tsx';
 
 interface Props {
   title: string;
@@ -76,12 +77,7 @@ const currentPath = Astro.url.pathname;
             </div>
           </div>
 
-          <a
-            href={`/${lang}/login`}
-            class="px-4 py-1.5 rounded-full text-[13px] font-medium text-gray-500 hover:text-gray-900 transition-colors"
-          >
-            {t(lang, 'nav.login')}
-          </a>
+          <UserMenu lang={lang} client:load />
         </div>
       </nav>
     </header>

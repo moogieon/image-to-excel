@@ -1,0 +1,78 @@
+# 신규 유저 생성 (회원가입 시)
+mutation CreateUser($uid: String!, $email: String!, $displayName: String) @auth(level: USER) {
+  user_insert(data: {
+    uid: $uid,
+    email: $email,
+    displayName: $displayName,
+    plan: FREE
+  })
+}
+
+# Free 구독 자동 생성 (서버 전용)
+mutation CreateFreeUserPlan($userId: User_Key!) @auth(level: NO_ACCESS) {
+  userPlan_insert(data: {
+    user: $userId,
+    plan: FREE,
+    name: "Free",
+    status: ACTIVE,
+    tokensRemaining: 3,
+    tokensTotal: 3
+  })
+}
+
+# 구독 업그레이드 (서버 전용)
+mutation UpgradeUserPlan(
+  $userId: User_Key!,
+  $plan: PlanType!,
+  $name: String!,
+  $tokens: Int!,
+  $billingCycle: String,
+  $expiresAt: Timestamp
+) @auth(level: NO_ACCESS) {
+  userPlan_insert(data: {
+    user: $userId,
+    plan: $plan,
+    name: $name,
+    status: ACTIVE,
+    tokensRemaining: $tokens,
+    tokensTotal: $tokens,
+    billingCycle: $billingCycle,
+    expiresAt: $expiresAt
+  })
+}
+
+# 토큰 차감 (서버 전용)
+mutation DeductToken($userPlanId: UserPlan_Key!, $remaining: Int!) @auth(level: NO_ACCESS) {
+  userPlan_update(key: $userPlanId, data: {
+    tokensRemaining: $remaining
+  })
+}
+
+# 구독 해지 (서버 전용)
+mutation CancelUserPlan(
+  $userPlanId: UserPlan_Key!,
+  $cancelReason: String
+) @auth(level: NO_ACCESS) {
+  userPlan_update(key: $userPlanId, data: {
+    status: CANCELED,
+    canceledAt_expr: "request.time",
+    cancelReason: $cancelReason
+  })
+}
+
+# 사용 이력 기록 (서버 전용)
+mutation LogUsage($userId: User_Key!, $pagesUsed: Int!, $fileName: String) @auth(level: NO_ACCESS) {
+  usageLog_insert(data: {
+    user: $userId,
+    pagesUsed: $pagesUsed,
+    fileName: $fileName
+  })
+}
+
+# 유저 플랜 업데이트 (서버 전용)
+mutation UpdateUserPlan($userId: User_Key!, $plan: PlanType!) @auth(level: NO_ACCESS) {
+  user_update(key: $userId, data: {
+    plan: $plan,
+    updatedAt_expr: "request.time"
+  })
+}

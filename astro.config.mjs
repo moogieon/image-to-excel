@@ -5,7 +5,7 @@ import node from '@astrojs/node';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  adapter: node({ mode: 'standalone' }),
+  adapter: node({ mode: 'middleware' }),
   integrations: [react()],
   i18n: {
     defaultLocale: 'en',

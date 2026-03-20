@@ -40,17 +40,26 @@ export interface ExtractedData {
   rows: string[][];
 }
 
-const API_BASE = 'http://localhost:8000';
+import { getIdToken } from './auth';
 
 export async function extractWithOCR(file: File): Promise<ExtractedData> {
   const base64 = await fileToBase64(file);
 
-  const response = await fetch(`${API_BASE}/api/extract`, {
+  const token = await getIdToken();
+  if (!token) {
+    throw new Error('Login required. Please sign in first.');
+  }
+
+  const response = await fetch('/api/extract', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({
       base64,
       mimeType: file.type,
+      fileName: file.name,
     }),
   });
 
@@ -70,9 +79,13 @@ export async function extractWithOCR(file: File): Promise<ExtractedData> {
 export async function fetchPreprocessPreview(file: File): Promise<string> {
   const base64 = await fileToBase64(file);
 
-  const response = await fetch(`${API_BASE}/api/preview/preprocess`, {
+  const token = await getIdToken();
+  const response = await fetch('/api/preview/preprocess', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
     body: JSON.stringify({ base64, mimeType: file.type }),
   });
 

@@ -1,0 +1,11 @@
+specVersion: "v1alpha"
+serviceId: "image-to-excel"
+location: "asia-northeast1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "image-to-excel-db"
+      cloudSql:
+        instanceId: "image-to-excel-sql"
+connectorDirs: ["./connector"]
