@@ -46,9 +46,9 @@ export default function UserMenu({ lang }: Props) {
     return unsubscribe;
   }, []);
 
-  // 팝오버 열릴 때 플랜 정보 가져오기
+  // 로그인 시 바로 플랜 정보 가져오기
   useEffect(() => {
-    if (!open || !user) return;
+    if (!user) return;
 
     (async () => {
       try {
@@ -64,7 +64,7 @@ export default function UserMenu({ lang }: Props) {
         // 무시
       }
     })();
-  }, [open, user]);
+  }, [user]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
