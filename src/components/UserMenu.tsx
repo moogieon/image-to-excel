@@ -54,7 +54,7 @@ export default function UserMenu({ lang }: Props) {
       try {
         const token = await getIdToken();
         if (!token) return;
-        const res = await fetch('https://image-to-excel-api-711666959026.asia-northeast3.run.app/api/me', {
+        const res = await fetch('/api/me', {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
