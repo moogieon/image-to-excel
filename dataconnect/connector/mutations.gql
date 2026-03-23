@@ -69,6 +69,14 @@ mutation LogUsage($userId: User_Key!, $pagesUsed: Int!, $fileName: String) @auth
   })
 }
 
+# 비로그인 체험 기록 (서버 전용)
+mutation LogAnonUsage($fingerprint: String!, $ip: String!) @auth(level: NO_ACCESS) {
+  anonUsage_insert(data: {
+    fingerprint: $fingerprint,
+    ip: $ip
+  })
+}
+
 # 유저 플랜 업데이트 (서버 전용)
 mutation UpdateUserPlan($userId: User_Key!, $plan: PlanType!) @auth(level: NO_ACCESS) {
   user_update(key: $userId, data: {

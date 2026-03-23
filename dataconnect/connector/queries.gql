@@ -34,6 +34,23 @@ query GetTodayUsage($uid: String!, $today: Timestamp!) @auth(level: USER) {
   }
 }
 
+# 비로그인 체험 여부 확인 (핑거프린트 OR IP)
+query CheckAnonUsageByFingerprint($fingerprint: String!) @auth(level: NO_ACCESS) {
+  anonUsages(where: { fingerprint: { eq: $fingerprint } }, limit: 1) {
+    id
+    fingerprint
+    ip
+  }
+}
+
+query CheckAnonUsageByIp($ip: String!) @auth(level: NO_ACCESS) {
+  anonUsages(where: { ip: { eq: $ip } }, limit: 1) {
+    id
+    fingerprint
+    ip
+  }
+}
+
 # 사용 이력 조회
 query GetUsageHistory($uid: String!, $limit: Int) @auth(level: USER) {
   usageLogs(
