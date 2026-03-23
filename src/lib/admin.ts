@@ -71,16 +71,19 @@ async function getAccessToken(): Promise<string> {
   return token.token!;
 }
 
-export async function dcQuery<T>(operationName: string, variables: Record<string, unknown>): Promise<T> {
-  const accessToken = await getAccessToken();
+export async function dcQuery<T>(operationName: string, variables: Record<string, unknown>, userToken?: string): Promise<T> {
   const url = `${DC_BASE}/projects/${PROJECT_ID}/locations/${LOCATION}/services/${SERVICE}/connectors/${CONNECTOR}:executeQuery`;
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (userToken) {
+    headers['x-firebase-auth-token'] = userToken;
+  }
+  const accessToken = await getAccessToken();
+  headers['Authorization'] = `Bearer ${accessToken}`;
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers,
     body: JSON.stringify({ operationName, variables }),
   });
 
@@ -93,16 +96,19 @@ export async function dcQuery<T>(operationName: string, variables: Record<string
   return data.data;
 }
 
-export async function dcMutation<T>(operationName: string, variables: Record<string, unknown>): Promise<T> {
-  const accessToken = await getAccessToken();
+export async function dcMutation<T>(operationName: string, variables: Record<string, unknown>, userToken?: string): Promise<T> {
   const url = `${DC_BASE}/projects/${PROJECT_ID}/locations/${LOCATION}/services/${SERVICE}/connectors/${CONNECTOR}:executeMutation`;
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (userToken) {
+    headers['x-firebase-auth-token'] = userToken;
+  }
+  const accessToken = await getAccessToken();
+  headers['Authorization'] = `Bearer ${accessToken}`;
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers,
     body: JSON.stringify({ operationName, variables }),
   });
 

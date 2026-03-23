@@ -50,7 +50,7 @@ export async function extractWithOCR(file: File): Promise<ExtractedData> {
     throw new Error('Login required. Please sign in first.');
   }
 
-  const response = await fetch('/api/extract', {
+  const response = await fetch('https://image-to-excel-api-711666959026.asia-northeast3.run.app/api/extract', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

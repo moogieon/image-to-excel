@@ -118,15 +118,18 @@ async function structureWithGpt4o(ocrText: string) {
 export const POST: APIRoute = async ({ request }) => {
   try {
     // 1. 인증 검증
+    const authHeader = request.headers.get('Authorization');
+    const rawToken = authHeader?.slice(7);
+
     let uid: string;
     try {
-      uid = await verifyToken(request.headers.get('Authorization'));
+      uid = await verifyToken(authHeader);
     } catch {
       return new Response(JSON.stringify({ error: 'Login required' }), { status: 401 });
     }
 
     // 2. 유저 + 구독 정보 조회 (없으면 자동 생성)
-    let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid });
+    let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
     let user = userData.users[0];
 
     if (!user) {
@@ -136,7 +139,7 @@ export const POST: APIRoute = async ({ request }) => {
         uid,
         email: authUser.email || '',
         displayName: authUser.displayName || null,
-      });
+      }, rawToken);
 
       // Free 구독 자동 생성
       const userId = createResult.user_insert;
@@ -145,7 +148,7 @@ export const POST: APIRoute = async ({ request }) => {
       }
 
       // 다시 조회
-      userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid });
+      userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
       user = userData.users[0];
 
       if (!user) {
@@ -165,7 +168,7 @@ export const POST: APIRoute = async ({ request }) => {
       const usageData = await dcQuery<GetTodayUsageData>('GetTodayUsage', {
         uid,
         today: today.toISOString(),
-      });
+      }, rawToken);
       const todayUsed = usageData.usageLogs.reduce((sum, log) => sum + log.pagesUsed, 0);
 
       if (todayUsed >= DAILY_FREE_LIMIT) {

@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import FileUploader from './FileUploader';
 import DataPreview from './DataPreview';
 import { extractWithOCR, type ExtractedData } from '../lib/ocr';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
 import { downloadExcel } from '../lib/excel';
+import funFacts from '../data/fun-facts.json';
 
 interface FileItem {
   file: File;
@@ -88,6 +89,28 @@ export default function Converter({ lang }: { lang: Lang }) {
 
   const isExtracting = step === 'extracting';
   const doneItems = items.filter(i => i.status === 'done' && i.data);
+
+  const [currentFact, setCurrentFact] = useState('');
+  const [factVisible, setFactVisible] = useState(false);
+
+  useEffect(() => {
+    if (!isExtracting) {
+      setFactVisible(false);
+      return;
+    }
+    const pick = () => funFacts[Math.floor(Math.random() * funFacts.length)];
+    setCurrentFact(pick());
+    setFactVisible(true);
+
+    const interval = setInterval(() => {
+      setFactVisible(false);
+      setTimeout(() => {
+        setCurrentFact(pick());
+        setFactVisible(true);
+      }, 500);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isExtracting]);
 
   return (
     <div className="space-y-5">
@@ -194,6 +217,15 @@ export default function Converter({ lang }: { lang: Lang }) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Fun fact during extraction */}
+      {isExtracting && (
+        <p
+          className={`text-center text-[16px] text-text-muted italic transition-opacity duration-500 ${factVisible ? 'opacity-100' : 'opacity-0'}`}
+        >
+          "{currentFact}"
+        </p>
       )}
 
       {/* Extract button */}

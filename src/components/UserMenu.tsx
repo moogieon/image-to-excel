@@ -54,7 +54,7 @@ export default function UserMenu({ lang }: Props) {
       try {
         const token = await getIdToken();
         if (!token) return;
-        const res = await fetch('/api/me', {
+        const res = await fetch('https://image-to-excel-api-711666959026.asia-northeast3.run.app/api/me', {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -81,7 +81,9 @@ export default function UserMenu({ lang }: Props) {
     window.location.href = `/${lang}`;
   };
 
-  if (loading) return null;
+  if (loading) {
+    return <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />;
+  }
 
   if (!user) {
     return (

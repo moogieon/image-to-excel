@@ -6,15 +6,18 @@ export const prerender = false;
 
 export const GET: APIRoute = async ({ request }) => {
   try {
+    const authHeader = request.headers.get('Authorization');
+    const rawToken = authHeader?.slice(7); // Bearer token
+
     let uid: string;
     try {
-      uid = await verifyToken(request.headers.get('Authorization'));
+      uid = await verifyToken(authHeader);
     } catch {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
 
     // 유저 조회 (없으면 자동 생성)
-    let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid });
+    let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
     let user = userData.users[0];
 
     if (!user) {
@@ -23,12 +26,12 @@ export const GET: APIRoute = async ({ request }) => {
         uid,
         email: authUser.email || '',
         displayName: authUser.displayName || null,
-      });
+      }, rawToken);
       const userId = createResult.user_insert;
       if (userId) {
         await dcMutation('CreateFreeUserPlan', { userId });
       }
-      userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid });
+      userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
       user = userData.users[0];
     }
 
@@ -46,7 +49,7 @@ export const GET: APIRoute = async ({ request }) => {
       const usageData = await dcQuery<GetTodayUsageData>('GetTodayUsage', {
         uid,
         today: today.toISOString(),
-      });
+      }, rawToken);
       todayUsed = usageData.usageLogs.reduce((sum, log) => sum + log.pagesUsed, 0);
     }
 
