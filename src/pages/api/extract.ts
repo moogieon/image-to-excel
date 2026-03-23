@@ -119,74 +119,102 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     // 1. 인증 검증
     const authHeader = request.headers.get('Authorization');
-    const rawToken = authHeader?.slice(7);
+    const rawToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const fingerprint = request.headers.get('X-Fingerprint');
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('cf-connecting-ip')
+      || 'unknown';
 
-    let uid: string;
-    try {
-      uid = await verifyToken(authHeader);
-    } catch {
-      return new Response(JSON.stringify({ error: 'Login required' }), { status: 401 });
-    }
+    let uid: string | null = null;
+    let isAnonymous = false;
 
-    // 2. 유저 + 구독 정보 조회 (없으면 자동 생성)
-    let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
-    let user = userData.users[0];
+    if (rawToken) {
+      try {
+        uid = await verifyToken(authHeader);
+      } catch {
+        return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401 });
+      }
+    } else {
+      // 비로그인 체험 모드
+      isAnonymous = true;
 
-    if (!user) {
-      // Firebase Auth에서 유저 정보 가져와서 자동 생성
-      const authUser = await getAdminAuth().getUser(uid);
-      const createResult = await dcMutation<CreateUserData>('CreateUser', {
-        uid,
-        email: authUser.email || '',
-        displayName: authUser.displayName || null,
-      }, rawToken);
-
-      // Free 구독 자동 생성
-      const userId = createResult.user_insert;
-      if (userId) {
-        await dcMutation('CreateFreeUserPlan', { userId });
+      if (!fingerprint) {
+        return new Response(JSON.stringify({ error: 'Login required' }), { status: 401 });
       }
 
-      // 다시 조회
-      userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
+      // 핑거프린트 OR IP 중 하나라도 이미 사용했으면 차단
+      const [byFp, byIp] = await Promise.all([
+        dcQuery<{ anonUsages: { id: string }[] }>('CheckAnonUsageByFingerprint', { fingerprint }),
+        dcQuery<{ anonUsages: { id: string }[] }>('CheckAnonUsageByIp', { ip: clientIp }),
+      ]);
+
+      if (byFp.anonUsages.length > 0 || byIp.anonUsages.length > 0) {
+        return new Response(JSON.stringify({
+          error: 'Free trial already used. Please sign up to continue.',
+          code: 'TRIAL_USED',
+        }), { status: 429 });
+      }
+    }
+
+    // 2. 로그인 유저: 구독 정보 조회
+    let user: any = null;
+    let activePlan: any = null;
+
+    if (uid) {
+      let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
       user = userData.users[0];
 
       if (!user) {
-        return new Response(JSON.stringify({ error: 'Failed to create user' }), { status: 500 });
+        const authUser = await getAdminAuth().getUser(uid);
+        const createResult = await dcMutation<CreateUserData>('CreateUser', {
+          uid,
+          email: authUser.email || '',
+          displayName: authUser.displayName || null,
+        }, rawToken);
+
+        const userId = createResult.user_insert;
+        if (userId) {
+          await dcMutation('CreateFreeUserPlan', { userId });
+        }
+
+        userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
+        user = userData.users[0];
+
+        if (!user) {
+          return new Response(JSON.stringify({ error: 'Failed to create user' }), { status: 500 });
+        }
       }
-    }
 
-    const activePlan = user.userPlans_on_user.find(p => p.status === 'ACTIVE');
+      activePlan = user.userPlans_on_user.find((p: any) => p.status === 'ACTIVE');
 
-    // 3. 크레딧 체크 (SUPER_ADMIN은 무제한)
-    if (user.plan === 'SUPER_ADMIN') {
-      // 무제한 — 크레딧 체크 스킵
-    } else if (user.plan === 'FREE' || !activePlan) {
-      // Free 플랜: 오늘 사용량 체크
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const usageData = await dcQuery<GetTodayUsageData>('GetTodayUsage', {
-        uid,
-        today: today.toISOString(),
-      }, rawToken);
-      const todayUsed = usageData.usageLogs.reduce((sum, log) => sum + log.pagesUsed, 0);
+      // 3. 크레딧 체크 (SUPER_ADMIN은 무제한)
+      if (user.plan === 'SUPER_ADMIN') {
+        // 무제한
+      } else if (user.plan === 'FREE' || !activePlan) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const usageData = await dcQuery<GetTodayUsageData>('GetTodayUsage', {
+          uid,
+          today: today.toISOString(),
+        }, rawToken);
+        const todayUsed = usageData.usageLogs.reduce((sum, log) => sum + log.pagesUsed, 0);
 
-      if (todayUsed >= DAILY_FREE_LIMIT) {
-        return new Response(JSON.stringify({
-          error: 'Daily free limit reached',
-          code: 'LIMIT_EXCEEDED',
-          used: todayUsed,
-          limit: DAILY_FREE_LIMIT,
-        }), { status: 429 });
-      }
-    } else {
-      // Pro/PayGo 플랜: 토큰 잔량 체크
-      if (activePlan.tokensRemaining <= 0) {
-        return new Response(JSON.stringify({
-          error: 'No tokens remaining',
-          code: 'NO_TOKENS',
-          tokensRemaining: 0,
-        }), { status: 429 });
+        if (todayUsed >= DAILY_FREE_LIMIT) {
+          return new Response(JSON.stringify({
+            error: 'Daily free limit reached',
+            code: 'LIMIT_EXCEEDED',
+            used: todayUsed,
+            limit: DAILY_FREE_LIMIT,
+          }), { status: 429 });
+        }
+      } else {
+        if (activePlan.tokensRemaining <= 0) {
+          return new Response(JSON.stringify({
+            error: 'No tokens remaining',
+            code: 'NO_TOKENS',
+            tokensRemaining: 0,
+          }), { status: 429 });
+        }
       }
     }
 
@@ -203,17 +231,21 @@ export const POST: APIRoute = async ({ request }) => {
     const result = await structureWithGpt4o(ocrText);
 
     // 6. 사용 기록 + 크레딧 차감
-    await dcMutation('LogUsage', {
-      userId: { id: user.id },
-      pagesUsed: 1,
-      fileName: (body as { fileName?: string }).fileName || null,
-    });
-
-    if (activePlan && user.plan !== 'FREE' && user.plan !== 'SUPER_ADMIN') {
-      await dcMutation('DeductToken', {
-        userPlanId: { id: activePlan.id },
-        remaining: activePlan.tokensRemaining - 1,
+    if (isAnonymous) {
+      await dcMutation('LogAnonUsage', { fingerprint: fingerprint!, ip: clientIp });
+    } else {
+      await dcMutation('LogUsage', {
+        userId: { id: user.id },
+        pagesUsed: 1,
+        fileName: (body as { fileName?: string }).fileName || null,
       });
+
+      if (activePlan && user.plan !== 'FREE' && user.plan !== 'SUPER_ADMIN') {
+        await dcMutation('DeductToken', {
+          userPlanId: { id: activePlan.id },
+          remaining: activePlan.tokensRemaining - 1,
+        });
+      }
     }
 
     return new Response(JSON.stringify(result), {

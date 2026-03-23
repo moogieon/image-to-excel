@@ -41,21 +41,25 @@ export interface ExtractedData {
 }
 
 import { getIdToken } from './auth';
+import { getFingerprint } from './fingerprint';
 
 export async function extractWithOCR(file: File): Promise<ExtractedData> {
   const base64 = await fileToBase64(file);
 
   const token = await getIdToken();
-  if (!token) {
-    throw new Error('Login required. Please sign in first.');
+  const fingerprint = await getFingerprint();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Fingerprint': fingerprint,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const response = await fetch('https://image-to-excel-api-711666959026.asia-northeast3.run.app/api/extract', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify({
       base64,
       mimeType: file.type,
