@@ -4,8 +4,8 @@ import { getAuth, type Auth } from 'firebase-admin/auth';
 const PROJECT_ID = 'image-to-excel-628ee';
 
 function getServiceAccountCredential() {
-  const clientEmail = import.meta.env.FIREBASE_SA_CLIENT_EMAIL;
-  const privateKey = import.meta.env.FIREBASE_SA_PRIVATE_KEY;
+  const clientEmail = import.meta.env.SA_CLIENT_EMAIL;
+  const privateKey = import.meta.env.SA_PRIVATE_KEY;
   if (clientEmail && privateKey) {
     return cert({
       projectId: PROJECT_ID,
@@ -53,8 +53,8 @@ const CONNECTOR = 'default';
 
 async function getAccessToken(): Promise<string> {
   const { GoogleAuth } = await import('google-auth-library');
-  const clientEmail = import.meta.env.FIREBASE_SA_CLIENT_EMAIL;
-  const privateKey = import.meta.env.FIREBASE_SA_PRIVATE_KEY;
+  const clientEmail = import.meta.env.SA_CLIENT_EMAIL;
+  const privateKey = import.meta.env.SA_PRIVATE_KEY;
 
   const auth = (clientEmail && privateKey)
     ? new GoogleAuth({
