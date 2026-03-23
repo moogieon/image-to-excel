@@ -26,6 +26,10 @@ jobs:
           PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.PUBLIC_FIREBASE_STORAGE_BUCKET }}
           PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           PUBLIC_FIREBASE_APP_ID: ${{ secrets.PUBLIC_FIREBASE_APP_ID }}
+          FIREBASE_SA_CLIENT_EMAIL: ${{ secrets.FIREBASE_SA_CLIENT_EMAIL }}
+          FIREBASE_SA_PRIVATE_KEY: ${{ secrets.FIREBASE_SA_PRIVATE_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - run: npm install -g firebase-tools
 
