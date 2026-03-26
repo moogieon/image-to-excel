@@ -1,28 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { getFirebaseAuth } from '../lib/firebase';
-import { getIdToken } from '../lib/auth';
+import { fetchUserInfo, clearUserInfo, type UserInfo } from '../lib/user-store';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
 
 interface Props {
   lang: Lang;
-}
-
-interface UserInfo {
-  uid: string;
-  email: string;
-  displayName: string | null;
-  plan: string;
-  planName: string;
-  tokensRemaining: number;
-  tokensTotal: number;
-  todayUsed: number;
-  billingCycle: string | null;
-  startedAt: string | null;
-  expiresAt: string | null;
-  canceledAt: string | null;
-  memberSince: string | null;
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -56,27 +40,30 @@ export default function MyPage({ lang }: Props) {
     return unsubscribe;
   }, [lang]);
 
-  useEffect(() => {
+  const loadInfo = useCallback(async () => {
     if (!user) return;
-    (async () => {
-      try {
-        const token = await getIdToken();
-        if (!token) return;
-        const res = await fetch('/api/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setInfo(await res.json());
-        } else {
-          setError('Failed to load user info');
-        }
-      } catch {
-        setError('Failed to load user info');
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchUserInfo();
+      if (data) {
+        setInfo(data);
+      } else {
+        setError('failed');
       }
-    })();
+    } catch {
+      setError('failed');
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => { loadInfo(); }, [loadInfo]);
+
+  const handleRetry = () => {
+    clearUserInfo();
+    loadInfo();
+  };
 
   if (loading) {
     return (
@@ -90,7 +77,32 @@ export default function MyPage({ lang }: Props) {
   }
 
   if (error) {
-    return <div className="text-center py-20 text-red-500 text-[14px]">{error}</div>;
+    return (
+      <div className="max-w-[400px] mx-auto py-16 text-center animate-scale-in">
+        <div className="liquid-glass rounded-[24px] p-8 space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-full bg-red-50 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-[15px] font-semibold text-gray-900">{t(lang, 'error.loadFailed.title')}</p>
+            <p className="text-[13px] text-gray-500 mt-1">{t(lang, 'error.loadFailed.desc')}</p>
+          </div>
+          <button
+            onClick={handleRetry}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[13px] font-semibold btn-primary"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            {t(lang, 'error.loadFailed.retry')}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!info) return null;

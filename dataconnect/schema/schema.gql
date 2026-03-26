@@ -48,7 +48,7 @@ type UsageLog @table {
 
 # 비로그인 체험 사용 기록 (핑거프린트 + IP 이중 체크)
 type AnonUsage @table {
-  fingerprint: String! @unique
+  fingerprint: String!
   ip: String!
   usedAt: Timestamp! @default(expr: "request.time")
 }

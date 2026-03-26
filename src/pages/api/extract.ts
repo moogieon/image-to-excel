@@ -6,6 +6,7 @@ export const prerender = false;
 
 // 플랜별 일일 무료 제한
 const DAILY_FREE_LIMIT = 3;
+const ANON_TRIAL_LIMIT = 2;
 
 const EXTRACTION_PROMPT = `Extract all tabular data from the following OCR text. Return the result as a JSON object with:
 - "headers": an array of column header strings
@@ -148,9 +149,10 @@ export const POST: APIRoute = async ({ request }) => {
         dcQuery<{ anonUsages: { id: string }[] }>('CheckAnonUsageByIp', { ip: clientIp }),
       ]);
 
-      if (byFp.anonUsages.length > 0 || byIp.anonUsages.length > 0) {
+      const anonUsed = Math.max(byFp.anonUsages.length, byIp.anonUsages.length);
+      if (anonUsed >= ANON_TRIAL_LIMIT) {
         return new Response(JSON.stringify({
-          error: 'Free trial already used. Please sign up to continue.',
+          error: 'Free trial limit reached. Please sign up to continue.',
           code: 'TRIAL_USED',
         }), { status: 429 });
       }
