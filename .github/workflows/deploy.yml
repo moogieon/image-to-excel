@@ -41,6 +41,6 @@ jobs:
       - name: Deploy to Firebase
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa-key.json
-          firebase deploy --project image-to-excel-628ee
+          firebase deploy --project image-to-excel-628ee --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
