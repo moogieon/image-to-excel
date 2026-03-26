@@ -1,17 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { getFirebaseAuth } from '../lib/firebase';
-import { signOut, getIdToken } from '../lib/auth';
+import { signOut } from '../lib/auth';
+import { trackEvent } from '../lib/analytics';
+import { fetchUserInfo, clearUserInfo, onUserInfoChange, type UserInfo } from '../lib/user-store';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
-
-interface PlanInfo {
-  plan: string;
-  planName: string;
-  tokensRemaining: number;
-  tokensTotal: number;
-  todayUsed?: number;
-}
 
 interface Props {
   lang: Lang;
@@ -35,36 +29,26 @@ export default function UserMenu({ lang }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
+  const [planInfo, setPlanInfo] = useState<UserInfo | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(getFirebaseAuth(), (u) => {
       setUser(u);
       setLoading(false);
+      if (u) {
+        fetchUserInfo().then(info => setPlanInfo(info));
+      } else {
+        clearUserInfo();
+        setPlanInfo(null);
+      }
     });
     return unsubscribe;
   }, []);
 
-  // 로그인 시 바로 플랜 정보 가져오기
   useEffect(() => {
-    if (!user) return;
-
-    (async () => {
-      try {
-        const token = await getIdToken();
-        if (!token) return;
-        const res = await fetch('/api/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setPlanInfo(await res.json());
-        }
-      } catch {
-        // 무시
-      }
-    })();
-  }, [user]);
+    return onUserInfoChange(info => setPlanInfo(info));
+  }, []);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -77,6 +61,8 @@ export default function UserMenu({ lang }: Props) {
   }, []);
 
   const handleSignOut = async () => {
+    trackEvent('sign_out');
+    clearUserInfo();
     await signOut();
     window.location.href = `/${lang}`;
   };

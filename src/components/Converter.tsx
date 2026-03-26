@@ -5,6 +5,7 @@ import { extractWithOCR, type ExtractedData } from '../lib/ocr';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
 import { downloadExcel } from '../lib/excel';
+import { trackEvent } from '../lib/analytics';
 import funFacts from '../data/fun-facts.json';
 
 interface FileItem {
@@ -25,6 +26,7 @@ export default function Converter({ lang }: { lang: Lang }) {
   const MAX_FILES = 10;
 
   const handleFileSelect = useCallback((files: File[]) => {
+    trackEvent('file_upload', { file_count: files.length });
     setItems(prev => {
       const combined = [
         ...prev,
@@ -48,6 +50,7 @@ export default function Converter({ lang }: { lang: Lang }) {
   };
 
   const handleExtract = async () => {
+    trackEvent('extraction_start', { file_count: items.length });
     setStep('extracting');
     for (let i = 0; i < items.length; i++) {
       setItems(prev => prev.map((item, idx) =>
@@ -64,6 +67,9 @@ export default function Converter({ lang }: { lang: Lang }) {
         ));
       }
     }
+    const successCount = items.filter(i => i.status === 'done').length;
+    const errorCount = items.filter(i => i.status === 'error').length;
+    trackEvent('extraction_complete', { success_count: successCount, error_count: errorCount });
     setStep('result');
   };
 
@@ -197,7 +203,7 @@ export default function Converter({ lang }: { lang: Lang }) {
                       {t(lang, 'result.preview')}
                     </button>
                     <button
-                      onClick={() => downloadExcel(item.data!, item.file.name)}
+                      onClick={() => { trackEvent('download_excel'); downloadExcel(item.data!, item.file.name); }}
                       className="btn-primary w-7 h-7 rounded-lg flex items-center justify-center"
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

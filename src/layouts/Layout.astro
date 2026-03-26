@@ -98,6 +98,12 @@ const currentPath = Astro.url.pathname;
       </div>
     </footer>
     <script>
+      import { getFirebaseAuth } from '../lib/firebase';
+      import { trackEvent } from '../lib/analytics';
+      // Initialize Firebase app (triggers analytics init via getAnalytics)
+      getFirebaseAuth();
+      trackEvent('page_view', { page_path: window.location.pathname });
+
       const btn = document.getElementById('lang-btn');
       const popover = document.getElementById('lang-popover');
       if (btn && popover) {
