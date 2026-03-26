@@ -38,9 +38,14 @@ jobs:
           echo "SA_CLIENT_EMAIL=${{ secrets.FIREBASE_SA_CLIENT_EMAIL }}" >> .env
           echo "SA_PRIVATE_KEY=${{ secrets.FIREBASE_SA_PRIVATE_KEY }}" >> .env
 
-      - name: Deploy to Firebase
+      - name: Migrate Data Connect schema
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa-key.json
-          firebase deploy --project image-to-excel-628ee --force
+          firebase dataconnect:sql:migrate --project image-to-excel-628ee --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
+
+      - name: Deploy to Firebase
+        run: firebase deploy --project image-to-excel-628ee --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
