@@ -51,7 +51,10 @@ function checkRateLimit(key: string): boolean {
 
 async function extractWithGemini(base64: string, mimeType: string) {
   const apiKey = import.meta.env.GEMINI_API_KEY;
-  const model = import.meta.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const configuredModel = import.meta.env.GEMINI_MODEL;
+  const model = !configuredModel || configuredModel === 'gemini-2.0-flash'
+    ? 'gemini-2.5-flash'
+    : configuredModel;
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
