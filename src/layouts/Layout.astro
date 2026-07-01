@@ -1,7 +1,6 @@
 ---
 import '../styles/global.css';
 import { languages, t, type Lang } from '../i18n/translations';
-import UserMenu from '../components/UserMenu.tsx';
 
 interface Props {
   title: string;
@@ -77,7 +76,6 @@ const currentPath = Astro.url.pathname;
             </div>
           </div>
 
-          <UserMenu lang={lang} client:load />
         </div>
       </nav>
     </header>
@@ -98,12 +96,6 @@ const currentPath = Astro.url.pathname;
       </div>
     </footer>
     <script>
-      import { getFirebaseAuth } from '../lib/firebase';
-      import { trackEvent } from '../lib/analytics';
-      // Initialize Firebase app (triggers analytics init via getAnalytics)
-      getFirebaseAuth();
-      trackEvent('page_view', { page_path: window.location.pathname });
-
       const btn = document.getElementById('lang-btn');
       const popover = document.getElementById('lang-popover');
       if (btn && popover) {

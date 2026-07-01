@@ -1,12 +1,12 @@
 import type { APIRoute } from 'astro';
-import { verifyToken, dcQuery, dcMutation, getAdminAuth } from '../../lib/admin';
-import type { GetUserWithPlanData, GetTodayUsageData, CreateUserData } from '../../lib/dataconnect-sdk';
 
 export const prerender = false;
 
-// 플랜별 일일 무료 제한
-const DAILY_FREE_LIMIT = 3;
-const ANON_TRIAL_LIMIT = 2;
+const ALLOWED_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
+const MAX_BASE64_CHARS = 28 * 1024 * 1024;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const RATE_LIMIT_MAX = 20;
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
 const EXTRACTION_PROMPT = `Extract all tabular data from the following OCR text. Return the result as a JSON object with:
 - "headers": an array of column header strings
@@ -26,10 +26,28 @@ function parseExtractedJson(text: string) {
   let jsonStr = text.trim();
   jsonStr = jsonStr.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
   const parsed = JSON.parse(jsonStr.trim());
-  if (!parsed.headers || !parsed.rows) {
+  if (!Array.isArray(parsed.headers) || !Array.isArray(parsed.rows)) {
     throw new Error('Invalid response structure');
   }
+  if (!parsed.headers.every((item: unknown) => typeof item === 'string')) {
+    throw new Error('Invalid header structure');
+  }
+  if (!parsed.rows.every((row: unknown) => Array.isArray(row) && row.every((cell) => typeof cell === 'string'))) {
+    throw new Error('Invalid row structure');
+  }
   return parsed;
+}
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateLimitBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (bucket.count >= RATE_LIMIT_MAX) return false;
+  bucket.count += 1;
+  return true;
 }
 
 // Step 1: Google Cloud Vision API → 이미지에서 텍스트 추출 (OCR)
@@ -118,137 +136,30 @@ async function structureWithGpt4o(ocrText: string) {
 // ─── API Route ───
 export const POST: APIRoute = async ({ request }) => {
   try {
-    // 1. 인증 검증
-    const authHeader = request.headers.get('Authorization');
-    const rawToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
     const fingerprint = request.headers.get('X-Fingerprint');
     const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
       || request.headers.get('cf-connecting-ip')
       || 'unknown';
-
-    let uid: string | null = null;
-    let isAnonymous = false;
-
-    if (rawToken) {
-      try {
-        uid = await verifyToken(authHeader);
-      } catch {
-        return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401 });
-      }
-    } else {
-      // 비로그인 체험 모드
-      isAnonymous = true;
-
-      if (!fingerprint) {
-        return new Response(JSON.stringify({ error: 'Login required' }), { status: 401 });
-      }
-
-      // 핑거프린트 OR IP 중 하나라도 이미 사용했으면 차단
-      const [byFp, byIp] = await Promise.all([
-        dcQuery<{ anonUsages: { id: string }[] }>('CheckAnonUsageByFingerprint', { fingerprint }),
-        dcQuery<{ anonUsages: { id: string }[] }>('CheckAnonUsageByIp', { ip: clientIp }),
-      ]);
-
-      const anonUsed = Math.max(byFp.anonUsages.length, byIp.anonUsages.length);
-      if (anonUsed >= ANON_TRIAL_LIMIT) {
-        return new Response(JSON.stringify({
-          error: 'Free trial limit reached. Please sign up to continue.',
-          code: 'TRIAL_USED',
-        }), { status: 429 });
-      }
+    const rateLimitKey = fingerprint || clientIp;
+    if (!checkRateLimit(rateLimitKey)) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), { status: 429 });
     }
 
-    // 2. 로그인 유저: 구독 정보 조회
-    let user: any = null;
-    let activePlan: any = null;
-
-    if (uid) {
-      let userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
-      user = userData.users[0];
-
-      if (!user) {
-        const authUser = await getAdminAuth().getUser(uid);
-        const createResult = await dcMutation<CreateUserData>('CreateUser', {
-          uid,
-          email: authUser.email || '',
-          displayName: authUser.displayName || null,
-        }, rawToken);
-
-        const userId = createResult.user_insert;
-        if (userId) {
-          await dcMutation('CreateFreeUserPlan', { userId });
-        }
-
-        userData = await dcQuery<GetUserWithPlanData>('GetUserWithPlan', { uid }, rawToken);
-        user = userData.users[0];
-
-        if (!user) {
-          return new Response(JSON.stringify({ error: 'Failed to create user' }), { status: 500 });
-        }
-      }
-
-      activePlan = user.userPlans_on_user.find((p: any) => p.status === 'ACTIVE');
-
-      // 3. 크레딧 체크 (SUPER_ADMIN은 무제한)
-      if (user.plan === 'SUPER_ADMIN') {
-        // 무제한
-      } else if (user.plan === 'FREE' || !activePlan) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const usageData = await dcQuery<GetTodayUsageData>('GetTodayUsage', {
-          uid,
-          today: today.toISOString(),
-        }, rawToken);
-        const todayUsed = usageData.usageLogs.reduce((sum, log) => sum + log.pagesUsed, 0);
-
-        if (todayUsed >= DAILY_FREE_LIMIT) {
-          return new Response(JSON.stringify({
-            error: 'Daily free limit reached',
-            code: 'LIMIT_EXCEEDED',
-            used: todayUsed,
-            limit: DAILY_FREE_LIMIT,
-          }), { status: 429 });
-        }
-      } else {
-        if (activePlan.tokensRemaining <= 0) {
-          return new Response(JSON.stringify({
-            error: 'No tokens remaining',
-            code: 'NO_TOKENS',
-            tokensRemaining: 0,
-          }), { status: 429 });
-        }
-      }
-    }
-
-    // 4. 요청 파싱
     const body = await request.json();
     const { base64, mimeType } = body as { base64: string; mimeType: string };
 
     if (!base64 || !mimeType) {
       return new Response(JSON.stringify({ error: 'Missing file data' }), { status: 400 });
     }
+    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+      return new Response(JSON.stringify({ error: 'Unsupported file type. Use PNG, JPG, WebP, or PDF.' }), { status: 400 });
+    }
+    if (base64.length > MAX_BASE64_CHARS) {
+      return new Response(JSON.stringify({ error: 'File too large. Maximum size is 20MB.' }), { status: 413 });
+    }
 
-    // 5. OCR 처리
     const ocrText = await ocrWithVision(base64);
     const result = await structureWithGpt4o(ocrText);
-
-    // 6. 사용 기록 + 크레딧 차감
-    if (isAnonymous) {
-      await dcMutation('LogAnonUsage', { fingerprint: fingerprint!, ip: clientIp });
-    } else {
-      await dcMutation('LogUsage', {
-        userId: { id: user.id },
-        pagesUsed: 1,
-        fileName: (body as { fileName?: string }).fileName || null,
-      });
-
-      if (activePlan && user.plan !== 'FREE' && user.plan !== 'SUPER_ADMIN') {
-        await dcMutation('DeductToken', {
-          userPlanId: { id: activePlan.id },
-          remaining: activePlan.tokensRemaining - 1,
-        });
-      }
-    }
 
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },

@@ -40,24 +40,19 @@ export interface ExtractedData {
   rows: string[][];
 }
 
-import { getIdToken } from './auth';
 import { getFingerprint } from './fingerprint';
 
 export async function extractWithOCR(file: File): Promise<ExtractedData> {
   const base64 = await fileToBase64(file);
 
-  const token = await getIdToken();
   const fingerprint = await getFingerprint();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Fingerprint': fingerprint,
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
-  const response = await fetch('https://image-to-excel-api-711666959026.asia-northeast3.run.app/api/extract', {
+  const response = await fetch('/api/extract', {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -70,7 +65,7 @@ export async function extractWithOCR(file: File): Promise<ExtractedData> {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.detail || `OCR error: ${response.status}`);
+    throw new Error(data.error || data.detail || `OCR error: ${response.status}`);
   }
 
   if (!data.headers || !data.rows) {
