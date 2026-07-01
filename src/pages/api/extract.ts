@@ -8,7 +8,7 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX = 20;
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
-const EXTRACTION_PROMPT = `Extract all tabular data from the following OCR text. Return the result as a JSON object with:
+const EXTRACTION_PROMPT = `Extract all tabular data from the provided image or PDF. Return the result as a JSON object with:
 - "headers": an array of column header strings
 - "rows": an array of arrays, where each inner array contains the cell values as strings
 
@@ -17,9 +17,8 @@ Rules:
 - These garbled texts are likely caused by strikethrough lines in the original image
 - If the text contains multiple tables, merge them if they have the same structure, or use the largest table
 - If there are no clear headers, generate descriptive headers based on the content
+- Preserve numbers, dates, item names, quantities, and prices as cell strings
 - Return ONLY the JSON object, no markdown or explanation
-
-OCR Text:
 `;
 
 function parseExtractedJson(text: string) {
@@ -50,72 +49,35 @@ function checkRateLimit(key: string): boolean {
   return true;
 }
 
-// Step 1: Google Cloud Vision API → 이미지에서 텍스트 추출 (OCR)
-async function ocrWithVision(base64: string): Promise<string> {
-  const apiKey = import.meta.env.GOOGLE_API_KEY;
-  if (!apiKey) throw new Error('GOOGLE_API_KEY not configured');
+async function extractWithGemini(base64: string, mimeType: string) {
+  const apiKey = import.meta.env.GEMINI_API_KEY;
+  const model = import.meta.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const response = await fetch(
-    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [
-          {
-            image: { content: base64 },
-            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-          },
-        ],
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(
-      (err as { error?: { message?: string } })?.error?.message ||
-        `Vision API error: ${response.status}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    responses: Array<{
-      textAnnotations?: Array<{ description: string }>;
-      error?: { message: string };
-    }>;
-  };
-
-  const result = data.responses[0];
-  if (result.error) throw new Error(result.error.message);
-
-  const ocrText = result.textAnnotations?.[0]?.description?.trim();
-  if (!ocrText) throw new Error('No text detected in the image.');
-
-  return ocrText;
-}
-
-// Step 2: GPT-4o → OCR 텍스트를 테이블 구조로 가공
-async function structureWithGpt4o(ocrText: string) {
-  const apiKey = import.meta.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
+      contents: [
         {
           role: 'user',
-          content: EXTRACTION_PROMPT + ocrText,
+          parts: [
+            { text: EXTRACTION_PROMPT },
+            {
+              inlineData: {
+                mimeType,
+                data: base64,
+              },
+            },
+          ],
         },
       ],
-      max_tokens: 4096,
-      temperature: 0,
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+      },
     }),
   });
 
@@ -123,14 +85,16 @@ async function structureWithGpt4o(ocrText: string) {
     const err = await response.json().catch(() => ({}));
     throw new Error(
       (err as { error?: { message?: string } })?.error?.message ||
-        `OpenAI API error: ${response.status}`
+        `Gemini API error: ${response.status}`
     );
   }
 
   const data = (await response.json()) as {
-    choices: Array<{ message: { content: string } }>;
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
-  return parseExtractedJson(data.choices[0]?.message?.content?.trim() ?? '');
+  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim() ?? '';
+  if (!text) throw new Error('Gemini returned empty extraction result');
+  return parseExtractedJson(text);
 }
 
 // ─── API Route ───
@@ -158,8 +122,7 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(JSON.stringify({ error: 'File too large. Maximum size is 20MB.' }), { status: 413 });
     }
 
-    const ocrText = await ocrWithVision(base64);
-    const result = await structureWithGpt4o(ocrText);
+    const result = await extractWithGemini(base64, mimeType);
 
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },
