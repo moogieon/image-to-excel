@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import FileUploader from './FileUploader';
 import DataPreview from './DataPreview';
-import { extractWithOCR, type ExtractedData } from '../lib/ocr';
+import { extractWithOCR, FREE_PAGE_LIMIT, type ExtractedData } from '../lib/ocr';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
 import { downloadExcel } from '../lib/excel';
@@ -23,8 +23,6 @@ export default function Converter({ lang }: { lang: Lang }) {
   const [items, setItems] = useState<FileItem[]>([]);
   const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
 
-  const MAX_FILES = 10;
-
   const handleFileSelect = useCallback((files: File[]) => {
     trackEvent('file_upload', { file_count: files.length });
     setItems(prev => {
@@ -36,7 +34,7 @@ export default function Converter({ lang }: { lang: Lang }) {
           thumbUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
         })),
       ];
-      return combined.slice(0, MAX_FILES);
+      return combined.slice(0, FREE_PAGE_LIMIT);
     });
     setStep('ready');
   }, []);
@@ -122,7 +120,13 @@ export default function Converter({ lang }: { lang: Lang }) {
     <div className="space-y-5">
       {/* Upload area */}
       {(step === 'upload' || step === 'ready') && (
-        <FileUploader lang={lang} onFileSelect={handleFileSelect} disabled={isExtracting} />
+        <FileUploader
+          lang={lang}
+          onFileSelect={handleFileSelect}
+          disabled={isExtracting}
+          maxFiles={FREE_PAGE_LIMIT}
+          currentFileCount={items.length}
+        />
       )}
 
       {/* File grid */}

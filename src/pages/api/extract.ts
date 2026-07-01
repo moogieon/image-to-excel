@@ -1,9 +1,12 @@
 import type { APIRoute } from 'astro';
+import { Buffer } from 'node:buffer';
 
 export const prerender = false;
 
 const ALLOWED_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
-const MAX_BASE64_CHARS = 28 * 1024 * 1024;
+const MAX_BASE64_CHARS = 14 * 1024 * 1024;
+const FREE_PAGE_LIMIT = 5;
+const PAID_PLAN_MESSAGE = '무료 테스트는 최대 5장 또는 파일당 10MB까지 지원합니다. 더 많은 페이지/이미지는 유료 플랜 준비중입니다.';
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX = 20;
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -47,6 +50,22 @@ function checkRateLimit(key: string): boolean {
   if (bucket.count >= RATE_LIMIT_MAX) return false;
   bucket.count += 1;
   return true;
+}
+
+function paidPlanPreparingResponse() {
+  return new Response(
+    JSON.stringify({ error: PAID_PLAN_MESSAGE, code: 'PAID_PLAN_PREPARING' }),
+    {
+      status: 402,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+}
+
+function estimatePdfPageCount(base64: string): number | undefined {
+  const text = Buffer.from(base64, 'base64').toString('latin1');
+  const matches = text.match(/\/Type\s*\/Page\b/g);
+  return matches?.length;
 }
 
 async function extractWithGemini(base64: string, mimeType: string) {
@@ -122,7 +141,13 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(JSON.stringify({ error: 'Unsupported file type. Use PNG, JPG, WebP, or PDF.' }), { status: 400 });
     }
     if (base64.length > MAX_BASE64_CHARS) {
-      return new Response(JSON.stringify({ error: 'File too large. Maximum size is 20MB.' }), { status: 413 });
+      return paidPlanPreparingResponse();
+    }
+    if (mimeType === 'application/pdf') {
+      const pageCount = estimatePdfPageCount(base64);
+      if (pageCount && pageCount > FREE_PAGE_LIMIT) {
+        return paidPlanPreparingResponse();
+      }
     }
 
     const result = await extractWithGemini(base64, mimeType);

@@ -5,14 +5,15 @@ const ALLOWED_TYPES = [
   'image/webp',
 ];
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+export const FREE_PAGE_LIMIT = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export function validateFile(file: File): string | null {
   if (!ALLOWED_TYPES.includes(file.type)) {
     return 'Unsupported file type. Please upload PDF, PNG, JPG, or WebP.';
   }
   if (file.size > MAX_FILE_SIZE) {
-    return 'File too large. Maximum size is 20MB.';
+    return '무료 테스트는 파일당 10MB까지 지원합니다. 더 큰 파일은 유료 플랜 준비중입니다.';
   }
   return null;
 }

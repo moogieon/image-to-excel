@@ -7,9 +7,17 @@ interface Props {
   lang: Lang;
   onFileSelect: (files: File[]) => void;
   disabled?: boolean;
+  maxFiles?: number;
+  currentFileCount?: number;
 }
 
-export default function FileUploader({ lang, onFileSelect, disabled }: Props) {
+export default function FileUploader({
+  lang,
+  onFileSelect,
+  disabled,
+  maxFiles,
+  currentFileCount = 0,
+}: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -19,6 +27,14 @@ export default function FileUploader({ lang, onFileSelect, disabled }: Props) {
   const handleFiles = useCallback(
     (files: File[]) => {
       setError(null);
+      if (maxFiles && currentFileCount + files.length > maxFiles) {
+        setError(
+          lang === 'ko'
+            ? `무료 테스트는 최대 ${maxFiles}장까지 지원합니다. 더 많은 페이지/이미지는 유료 플랜 준비중입니다.`
+            : `Free testing supports up to ${maxFiles} pages/files. Larger jobs are coming in a paid plan.`
+        );
+        return;
+      }
       const valid: File[] = [];
       for (const file of files) {
         const validationError = validateFile(file);
@@ -32,7 +48,7 @@ export default function FileUploader({ lang, onFileSelect, disabled }: Props) {
       setFileName(valid.length === 1 ? valid[0].name : `${valid.length} files`);
       onFileSelect(valid);
     },
-    [onFileSelect]
+    [currentFileCount, lang, maxFiles, onFileSelect]
   );
 
   const handleDrop = useCallback(
