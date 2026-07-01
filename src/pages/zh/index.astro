@@ -1,7 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import Converter from '../../components/Converter';
-import PricingCard from '../../components/PricingCard';
 import { t } from '../../i18n/translations';
 
 const lang = 'zh';
@@ -19,11 +18,4 @@ const lang = 'zh';
     </div>
   </section>
   <section class="pb-20 px-5"><div class="max-w-2xl mx-auto"><Converter lang={lang} client:load /></div></section>
-  <section id="pricing" class="py-16 px-5">
-    <div class="max-w-4xl mx-auto">
-      <h2 class="text-[28px] font-bold text-center mb-3 tracking-tight">{t(lang, 'pricing.title')}</h2>
-      <p class="text-center text-text-muted text-[15px] mb-10">1积分 = 1页</p>
-      <PricingCard lang={lang} client:visible />
-    </div>
-  </section>
 </Layout>
